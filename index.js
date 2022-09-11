@@ -5,6 +5,7 @@ import { MongoClient } from "mongodb";
 import joi from "joi";
 import bcrypt from "bcrypt";
 import {v4 as uuid} from "uuid";
+import dayjs from "dayjs";
 
 
 const app = express();
@@ -90,6 +91,104 @@ app.post("/sign-in", async (req, res) => {
     
 });
 
+
+app.get("/transactions", async (req, res) => {
+    const { authorization } = req.headers;
+    const token = authorization?.replace("Bearer", "").trim();
+
+    if(!token){
+        return res.sendStatus(401);
+    }
+
+    try{
+        const sessao = await db.collection("sessoes").findOne({ token });
+
+        if(!sessao){
+            return res.sendStatus(401);
+        }
+
+        const usuario = await db.collection("usuarios").findOne({_id: sessao.usuarioId});
+
+        if(!usuario){
+            return res.sendStatus(401);
+        } else {
+            delete usuario.senha;
+            res.send(usuario);
+        }
+
+        
+    } catch(error) {
+        console.log("Erro ao buscar usuário pela sessão");
+        return res.sendStatus(500);
+    }
+
+    try {
+        const transactions = await db.collection("transactions").find({usuarioId: usuario._id}).toArray();
+        res.send(transactions);
+    } catch(e) {
+        console.log("Erro ao obter as transações", e);
+        return res.sendStatus(500);
+    }
+
+});
+
+app.post("/transactions", async (req, res) => {
+    const transactionSchema = joi.object({
+        tipo: joi.string().required(),
+        descricao: joi.string().required(),
+        valor: joi.number().required()
+    });
+
+    const { error } = transactionSchema.validate(req.body);
+    if(error){
+        res.status(422).send(error.details.map(detail => detail.message));
+        return;
+    }
+
+    const { authorization } = req.headers;
+    const token = authorization?.replace("Bearer", "").trim();
+
+    if(!token){
+        return res.sendStatus(401);
+    }
+
+    try{
+        const sessao = await db.collection("sessoes").findOne({ token });
+
+        if(!sessao){
+            return res.sendStatus(401);
+        }
+
+        const usuario = await db.collection("usuarios").findOne({_id: sessao.usuarioId});
+
+        if(!usuario){
+            return res.sendStatus(401);
+        } else {
+            delete usuario.senha;
+            res.send(usuario);
+        }
+        
+    } catch(error) {
+        console.log("Erro ao buscar usuário pela sessão", error);
+        res.sendStatus(500);
+    }
+
+    try{
+        const {tipo, descricao, valor} = req.body;
+        await db.collection("transactions").insertOne({
+            tipo,
+            valor,
+            descricao,
+            data: dayjs().format('DD/MM'),
+            usuarioId: usuario._id
+        });
+        res.sendStatus(201);
+    } catch(e) {
+        console.log("Erro ao adicionar nova transação.", e);
+    }
+
+    
+});
 
 const port = process.env.PORTA || 5000;
 app.listen(port, () => {
