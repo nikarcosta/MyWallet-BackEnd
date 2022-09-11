@@ -53,6 +53,44 @@ app.post("/sign-up", async (req, res) => {
 
 });
 
+app.post("/sign-in", async (req, res) => {
+    const { email, senha } = req.body;
+
+    const loginSchema = joi.object({
+        email: joi.string().email().required(),
+        senha: joi.string().required()
+    });
+
+    const { error } = loginSchema.validate(req.body, { abortEarly: false});
+
+    if(error){
+        res.status(422).send(error.details.map(detail => detail.message));
+        return;
+    }
+
+    try {
+        const usuario = await db.collection("usuarios").findOne({email});
+        if(!usuario){
+            return res.sendStatus(404);
+        }
+    
+        if(usuario && bcrypt.compareSync(senha, usuario.senha)){
+            const token = uuid();
+            
+            await db.collection("sessoes").insertOne({ token, usuarioId: usuario._id});
+    
+            res.status(200).send(token);
+        } else {
+            res.send("Usuário ou senha incorretos.Tente novamente").status(404);
+        }
+    } catch(e) {
+        res.sendStatus(500);
+        console.log("Erro ao fazer o login!", e);
+    }
+    
+});
+
+
 const port = process.env.PORTA || 5000;
 app.listen(port, () => {
     console.log(`Servidor rodando na porta ${port}`);
