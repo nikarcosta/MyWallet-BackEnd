@@ -104,25 +104,15 @@ app.get("/transactions", async (req, res) => {
         const sessao = await db.collection("sessoes").findOne({ token });
 
         if(!sessao){
-            return res.sendStatus(401);
+            return res.status(401).send("Não existe sessão.");
         }
 
         const usuario = await db.collection("usuarios").findOne({_id: sessao.usuarioId});
 
         if(!usuario){
             return res.sendStatus(401);
-        } else {
-            delete usuario.senha;
-            res.send(usuario);
         }
-
         
-    } catch(error) {
-        console.log("Erro ao buscar usuário pela sessão");
-        return res.sendStatus(500);
-    }
-
-    try {
         const transactions = await db.collection("transactions").find({usuarioId: usuario._id}).toArray();
         res.send(transactions);
     } catch(e) {
@@ -156,24 +146,15 @@ app.post("/transactions", async (req, res) => {
         const sessao = await db.collection("sessoes").findOne({ token });
 
         if(!sessao){
-            return res.sendStatus(401);
+            return res.status(401).send("Não existe sessão.");
         }
 
         const usuario = await db.collection("usuarios").findOne({_id: sessao.usuarioId});
 
         if(!usuario){
             return res.sendStatus(401);
-        } else {
-            delete usuario.senha;
-            res.send(usuario);
         }
-        
-    } catch(error) {
-        console.log("Erro ao buscar usuário pela sessão", error);
-        res.sendStatus(500);
-    }
 
-    try{
         const {tipo, descricao, valor} = req.body;
         await db.collection("transactions").insertOne({
             tipo,
@@ -183,8 +164,10 @@ app.post("/transactions", async (req, res) => {
             usuarioId: usuario._id
         });
         res.sendStatus(201);
+
     } catch(e) {
         console.log("Erro ao adicionar nova transação.", e);
+        res.status(500).send("Erro ao adicionar nova transação.");
     }
 
     
